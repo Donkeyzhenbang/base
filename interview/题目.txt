@@ -1,0 +1,89 @@
+定义包含变量、加法和乘法的表达式类型，建议：
+
+class Expr:
+
+    pass
+
+ 
+
+class Var(Expr):
+
+    def __init__(self, name: str):
+
+        pass
+
+ 
+
+class Add(Expr):
+
+    def __init__(self, left: Expr, right: Expr):
+
+        pass
+
+ 
+
+class Mult(Expr):
+
+    def __init__(self, left: Expr, right: Expr):
+
+        pass
+
+ 
+
+通过__str__定义表达式的打印函数，按照乘法比加法优先，加法和乘法向左结合的约定自动添加最少所需的括号。例如
+
+print(Add(Var("x"), Mult(Var("y"), Var("z"))))# x + y * z
+
+print(Mult(Add(Var("x"), Var("y")), Var("z")))# (x + y) * z
+
+print(Add(Add(Var("x"), Var("y")), Var("z")))# x + y + z
+
+print(Add(Var("x"), Add(Var("y"), Var("z"))))# x + (y + z)
+
+其他测试用例：
+
+x * y + z, x * (y + z), x * y * z, x * (y * z)定义包含变量、加法和乘法的表达式类型，建议：
+
+class Expr:
+
+    pass
+
+ 
+
+class Var(Expr):
+
+    def __init__(self, name: str):
+
+        pass
+
+ 
+
+class Add(Expr):
+
+    def __init__(self, left: Expr, right: Expr):
+
+        pass
+
+ 
+
+class Mult(Expr):
+
+    def __init__(self, left: Expr, right: Expr):
+
+        pass
+
+ 
+
+通过__str__定义表达式的打印函数，按照乘法比加法优先，加法和乘法向左结合的约定自动添加最少所需的括号。例如
+
+print(Add(Var("x"), Mult(Var("y"), Var("z"))))# x + y * z
+
+print(Mult(Add(Var("x"), Var("y")), Var("z")))# (x + y) * z
+
+print(Add(Add(Var("x"), Var("y")), Var("z")))# x + y + z
+
+print(Add(Var("x"), Add(Var("y"), Var("z"))))# x + (y + z)
+
+其他测试用例：
+
+x * y + z, x * (y + z), x * y * z, x * (y * z)
