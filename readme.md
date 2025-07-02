@@ -394,3 +394,231 @@ if (text) {
 
 
 ```
+
+### initializer_list 列表初始化
+
+std::initializer_list 是 C++11 引入的一个模板类，用于表示初始化列表。它提供了一种简洁、统一的方式来处理花括号 {} 初始化语法
+
+头文件：
+- <initializer_list>
+
+主要用途：
+- 构造函数的初始化列表参数
+- 函数参数传递初始化列表
+
+特性
+- 轻量级容器，提供只读访问
+- 元素在内存中连续存储
+- 生命周期由编译器管理
+- 支持范围 for 循环
+
+成员函数：
+- begin()	返回指向第一个元素的迭代器
+- end()	返回指向末尾的迭代器
+- size()	返回元素数量
+- empty()	检查列表是否为空
+
+使用方法 构造函数
+
+```cpp
+#include <initializer_list>
+#include <iostream>
+#include <vector>
+
+class MyArray {
+public:
+    // 支持初始化列表的构造函数
+    MyArray(std::initializer_list<int> list) 
+        : size_(list.size()), data_(new int[list.size()]) 
+    {
+        std::copy(list.begin(), list.end(), data_);
+        std::cout << "Constructed with initializer_list\n";
+    }
+    
+    void print() const {
+        for (size_t i = 0; i < size_; ++i) {
+            std::cout << data_[i] << " ";
+        }
+        std::cout << "\n";
+    }
+    
+    ~MyArray() { delete[] data_; }
+
+private:
+    size_t size_;
+    int* data_;
+};
+
+int main() {
+    // 使用初始化列表构造对象
+    MyArray arr = {1, 2, 3, 4, 5};
+    arr.print();
+    
+    // 标准库容器也使用相同机制
+    std::vector<int> vec = {10, 20, 30};
+    for (int n : vec) {
+        std::cout << n << " ";
+    }
+    return 0;
+}
+```
+
+自定义类型推导
+```cpp
+#include <initializer_list>
+#include <type_traits>
+
+template <typename T>
+class MyContainer {
+public:
+    MyContainer(std::initializer_list<T> list) {
+        // 构造实现
+    }
+    
+    // 对于异构初始化列表（需要C++17）
+    template <typename... Ts>
+    MyContainer(Ts&&... args) {
+        // 需要处理类型转换
+    }
+};
+
+// 使用
+MyContainer<int> mc1 = {1, 2, 3}; // OK
+
+// C++17 支持类模板参数推导
+MyContainer mc2 = {1, 2, 3}; // 推导为 MyContainer<int>
+```
+
+{}列表初始化与 initializer_list区别
+- std::initializer_list：是定义在 <initializer_list> 中的模板类，是一个轻量级容器，表示初始化列表，主要用于构造函数的参数类型
+- {}是语法糖，std::initializer_list是标准库工具，比如在函数参数传递初始化列表就需要std::initializer_list
+- std::initializer_list会返回类型，可以是容器类型，提供begin,end，size,empty等方法
+
+函数参数传递初始化列表
+```cpp
+// 只能使用 initializer_list
+void process(std::initializer_list<int> values) {
+    for (int v : values) {
+        // 处理每个值
+    }
+}
+
+process({1, 2, 3}); // 正确 ✅
+process{1, 2, 3};    // 错误 ❌
+
+```
+
+```cpp
+template <typename T>
+class FlexibleContainer {
+public:
+    // 通用构造函数
+    template <typename... Args>
+    FlexibleContainer(Args... args);
+    
+    // 特化的初始化列表版本
+    FlexibleContainer(std::initializer_list<T> init);
+};
+
+// 调用区分
+FlexibleContainer<int> a(1, 2, 3); // 调用通用版本
+FlexibleContainer<int> b{1, 2, 3};   // 调用initializer_list版本
+```
+
+### WebBench源码阅读
+
+#### 主要函数
+
+* alarm_handler 信号处理函数，时钟结束时进行调用。
+* usage 输出 webbench 命令用法
+* main 提供程序入口...
+* build_request 构造 HTTP 请求
+* bench 派生子进程，父子进程管道通信最后输出计算结果。
+* benchcore 每个子进程的实际发起请求函数。
+
+#### 主要流程
+
+说一下程序执行的主要流程：
+
+1. 解析命令行参数，根据命令行指定参数设定变量，可以认为是初始化配置。
+2. 根据指定的配置构造 HTTP 请求报文格式。
+3. 开始执行 bench 函数，先进行一次 socket 连接建立与断开，测试是否可以正常访问。
+4. 建立管道，派生根据指定进程数派生子进程。
+5. 每个子进程调用 benchcore 函数，先通过 sigaction 安装信号，用 alarm 设置闹钟函数，接着不断建立 socket 进行通信，与服务器交互数据，直到收到信号结束访问测试。子进程将访问测试结果写进管道。
+6. 父进程读取管道数据，汇总子进程信息，收到所有子进程消息后，输出汇总信息，结束。
+
+- 父进程：fork() 返回子进程PID（继续循环）
+- 子进程：fork() 返回0（跳出循环）
+- 错误：fork() 返回负数（报错退出）
+
+子进程执行逻辑
+```cpp
+if (pid == (pid_t)0) {
+    /* 执行压测 */
+    if (proxyhost == NULL)
+        benchcore(host, proxyport, request);
+    else
+        benchcore(proxyhost, proxyport, request); 
+    
+    /* 将结果写入管道 */
+    f = fdopen(mypipe[1], "w");
+    fprintf(f, "%d %d %d\n", speed, failed, bytes); // 成功数 失败数 总字节
+    fclose(f);
+    return 0;
+}
+```
+
+benchcore
+```cpp
+void benchcore(const char* host, const int port, const char* req) {
+    // 1. 设置超时处理（SIGALRM信号）
+    sa.sa_handler = alarm_handler;
+    sigaction(SIGALRM, &sa, NULL);
+    alarm(benchtime); // 设置测试时长
+    
+    // 2. 测试循环
+    while (1) {
+        if (timerexpired) return; // 超时退出
+        
+        // 3. 创建TCP连接
+        s = Socket(host, port);
+        if (s < 0) { failed++; continue; }
+        
+        // 4. 发送HTTP请求
+        if (write(s, req, strlen(req)) != rlen) { 
+            failed++; close(s); continue; 
+        }
+        
+        // 5. 处理不同HTTP版本
+        if (http10 == 0) shutdown(s, 1); // HTTP/0.9关闭写端
+        
+        // 6. 接收响应（非强制模式）
+        if (force == 0) {
+            while (!timerexpired) {
+                int n = read(s, buf, sizeof(buf));
+                if (n < 0) { // 读取错误
+                    failed++; close(s); 
+                    goto nexttry; // 重试新连接
+                } 
+                else if (n == 0) break; // 对端关闭
+                else bytes += n;        // 统计字节
+            }
+        }
+        
+        // 7. 关闭连接
+        if (close(s)) failed++;
+        else speed++; // 成功计数
+    }
+nexttry: ; // 重试标签
+}
+```
+
+![alt text](assets/webbench.png)
+
+![alt text](assets/webbench-benchcore.png)
+
+超时控制机制
+- ​原理​​：使用 alarm(benchtime) + SIGALRM 信号
+- ​触发​​：到达测试时间后，内核发送 SIGALRM 信号
+- ​处理​​：alarm_handler 设置 timerexpired=1
+- ​作用​​：确保测试精确控制在指定时间内
