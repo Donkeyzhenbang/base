@@ -617,8 +617,42 @@ nexttry: ; // 重试标签
 
 ![alt text](assets/webbench-benchcore.png)
 
-超时控制机制
+#### 超时控制机制
 - ​原理​​：使用 alarm(benchtime) + SIGALRM 信号
 - ​触发​​：到达测试时间后，内核发送 SIGALRM 信号
 - ​处理​​：alarm_handler 设置 timerexpired=1
 - ​作用​​：确保测试精确控制在指定时间内
+
+#### 超时错误机制处理
+这里相当于是多进程，所以每个进程都会看到timerexpired初值设置为0后续被修改为1每个进程仅有一次
+```cpp
+volatile int timerexpired = 0;
+static void alarm_handler(int signal) {
+    timerexpired = 1;
+}
+```
+假设在5秒测试结束时：
+
+- 2500个并发客户端中
+- 有20个正阻塞在connect()调用
+- ​信号中断会导致：​​
+    - 20次failed++ ➔ 如果不修正
+    - 最终报告20次失败（实际是测试中断引起）
+
+### threadpool
+完美引用+万能转发 避免资源的二次拷贝 完全由引用主导，提高效率 注意这里使用F通常表示可调用对象
+```cpp
+template<class F>   //F通常表示可调用对象
+void AddTask(F&& task){ //万能引用 既可以当左值引用 又可以当右值引用
+    {
+        std::lock_guard<std::mutex> lock(pool_->mutex_);
+        pool_->tasks_.emplace(std::forward<F>(task));   //完美转发
+    }
+    pool_->cv_.notify_one(); //接收到任务响应条件变量
+}
+```
+`static_cast<bool>(pool_)` 当 pool_ 持有有效对象 → true
+当 pool_ 为 nullptr → false
+- 检测 pool_ 是否指向有效对象​​
+- ​只在有效时执行资源清理​​
+- ​避免在无效或已移动对象上操作​​
