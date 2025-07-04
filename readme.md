@@ -126,6 +126,7 @@ std::thread custom_producer(
 
 3. 之前也是这个producer模板类，之前的模板初始化确实是不完整的，没有明确实例化
 
+## 模板
 
 ### 模板特化
 - 模板特化是 C++ 模板编程中的高级技术，它允许开发者​​为特定类型提供自定义实现​​。
@@ -525,9 +526,9 @@ FlexibleContainer<int> a(1, 2, 3); // 调用通用版本
 FlexibleContainer<int> b{1, 2, 3};   // 调用initializer_list版本
 ```
 
-### WebBench源码阅读
+## WebBench源码阅读
 
-#### 主要函数
+### 主要函数
 
 * alarm_handler 信号处理函数，时钟结束时进行调用。
 * usage 输出 webbench 命令用法
@@ -536,7 +537,7 @@ FlexibleContainer<int> b{1, 2, 3};   // 调用initializer_list版本
 * bench 派生子进程，父子进程管道通信最后输出计算结果。
 * benchcore 每个子进程的实际发起请求函数。
 
-#### 主要流程
+### 主要流程
 
 说一下程序执行的主要流程：
 
@@ -617,13 +618,13 @@ nexttry: ; // 重试标签
 
 ![alt text](assets/webbench-benchcore.png)
 
-#### 超时控制机制
+### 超时控制机制
 - ​原理​​：使用 alarm(benchtime) + SIGALRM 信号
 - ​触发​​：到达测试时间后，内核发送 SIGALRM 信号
 - ​处理​​：alarm_handler 设置 timerexpired=1
 - ​作用​​：确保测试精确控制在指定时间内
 
-#### 超时错误机制处理
+### 超时错误机制处理
 这里相当于是多进程，所以每个进程都会看到timerexpired初值设置为0后续被修改为1每个进程仅有一次
 ```cpp
 volatile int timerexpired = 0;
@@ -639,7 +640,7 @@ static void alarm_handler(int signal) {
     - 20次failed++ ➔ 如果不修正
     - 最终报告20次失败（实际是测试中断引起）
 
-### threadpool
+## threadpool
 完美引用+万能转发 避免资源的二次拷贝 完全由引用主导，提高效率 注意这里使用F通常表示可调用对象
 ```cpp
 template<class F>   //F通常表示可调用对象
@@ -918,4 +919,307 @@ MyArray<T>::~MyArray()
         delete[] data;
     }
 }
+```
+
+### constexpr
+- 编译器报告 unary '*' 错误的原因。要解决这个问题，必须确保当 T` 不是指针类型时，相关的代码不会被实例化或编译。
+```cpp
+Vector(const std::initializer_list<T>& list){
+        size_ = list.size();
+        capacity_ = list.size();
+        if(list.size()){
+            size_t count = 0;
+            data = new T[list.size()]();
+            if constexpr (std::is_pointer<T>::value)
+            {
+                //  T为int时 此时条件为false 但是编译器还是会选择编译这部分代码
+                //  编译器报告 unary '*' 错误的原因。要解决这个问题，必须确保当 T` 不是指针类型时，相关的代码不会被实例化或编译。
+                for(const auto& elem : list){
+                    data[count++] = new element_type_t<T>(*elem);
+                }
+            }
+            else 
+            {
+                for(const auto& elem : list){
+                    data[count ++] = elem;
+                }
+            }
+        }
+        else{
+            data = nullptr;
+        }
+    }
+```
+
+- 编译时决策，不会尝试编译不满足条件的代码块
+- 解决类型不匹配问题
+- 代码清晰简洁
+
+### rebind
+
+- rebind 比如List他是三个元素 但是我们在模板类创建时使用的是std::list<int>，其内部还需要rebind把他们组合到一起进行内存分配std::list<int, std::allocator<int>> myList;
+
+```cpp
+// List节点结构（简化）
+struct ListNode {
+    ListNode* next;  // 指针域
+    ListNode* prev;  // 指针域
+    int data;         // 数据域
+};
+
+template <typename T>
+class Allocator {
+public:
+    // 关键：rebind 元编程机制
+    template <typename U>
+    struct rebind {
+        using other = Allocator<U>; // 可重绑定到其他类型
+    };
+    
+    T* allocate(size_t n);
+    void deallocate(T* p, size_t n);
+    // ...
+};
+
+template <typename T, typename Alloc = std::allocator<T>>
+class list {
+private:
+    // 定义内部节点类型
+    struct Node {
+        T value;
+        Node* next;
+        Node* prev;
+    };
+    
+    // 关键步骤：重绑定分配器
+    using NodeAlloc = typename Alloc::template rebind<Node>::other;
+    
+    NodeAlloc nodeAllocator; // 节点专用分配器
+    
+public:
+    // 添加元素实现
+    void push_back(const T& value) {
+        // 用节点分配器分配内存
+        Node* newNode = nodeAllocator.allocate(1);
+        
+        // 构造节点
+        new (&newNode->value) T(value); // 构造元素值
+        
+        // 链接节点
+        // ...
+    }
+};
+```
+
+
+## 内存池
+
+这些api是STL allocator提供的，我们在重构内存池的时候相当于重构这些函数，这样在自己实现一个数据结构亦或者使用其他STL容器时可以兼容这内存池，我们的MemeryPool也是Allocater类型
+
+```cpp
+
+#ifndef MEMORY_POOL_H
+#define MEMORY_POOL_H
+
+#include <limits.h>
+#include <stddef.h>
+
+template <typename T, size_t BlockSize = 4096>
+class MemoryPool
+{
+  public:
+    /* Member types */
+    typedef T               value_type;       // T 的 value 类型
+    typedef T*              pointer;          // T 的 指针类型
+    typedef T&              reference;        // T 的引用类型
+    typedef const T*        const_pointer;    // T 的 const 指针类型
+    typedef const T&        const_reference;  // T 的 const 引用类型
+    typedef size_t          size_type;        // size_t 类型
+    typedef ptrdiff_t       difference_type;  // 指针减法结果类型
+
+    // 这个来源于 allocate 的标准
+    template <typename U> struct rebind {
+      typedef MemoryPool<U> other;
+    };
+
+    /* Member functions */
+    /* 构造函数 */
+    MemoryPool() throw();
+    MemoryPool(const MemoryPool& memoryPool) throw();
+    template <class U> MemoryPool(const MemoryPool<U>& memoryPool) throw();
+
+    /* 析构函数 */
+    ~MemoryPool() throw();
+
+    /* 元素取址 */
+    pointer address(reference x) const throw();
+    const_pointer address(const_reference x) const throw();
+
+    // Can only allocate one object at a time. n and hint are ignored
+    // 分配和收回一个元素的内存空间
+    pointer allocate(size_type n = 1, const_pointer hint = 0);
+    void deallocate(pointer p, size_type n = 1);
+
+    // 最大大小
+    size_type max_size() const throw();
+
+    // 基于内存池的元素构造和析构
+    void construct(pointer p, const_reference val);
+    void destroy(pointer p);
+
+    // 自带申请内存和释放内存的构造和析构
+    pointer newElement(const_reference val);
+    void deleteElement(pointer p);
+
+  private:
+    // union 结构体,用于存放元素或 next 指针
+    union Slot_ {
+      value_type element;
+      Slot_* next;
+    };
+
+    typedef char* data_pointer_;  // char* 指针，主要用于指向内存首地址
+    typedef Slot_ slot_type_;     // Slot_ 值类型
+    typedef Slot_* slot_pointer_; // Slot_* 指针类型
+
+    slot_pointer_ currentBlock_;  // 内存块链表的头指针
+    slot_pointer_ currentSlot_;   // 元素链表的头指针
+    slot_pointer_ lastSlot_;      // 可存放元素的最后指针
+    slot_pointer_ freeSlots_;     // 元素构造后释放掉的内存链表头指针
+
+    size_type padPointer(data_pointer_ p, size_type align) const throw();  // 计算对齐所需空间
+    void allocateBlock();  // 申请内存块放进内存池
+   /*
+    static_assert(BlockSize >= 2 * sizeof(slot_type_), "BlockSize too small.");
+    */
+};
+
+#include "MemoryPool.tcc"
+
+#endif // MEMORY_POOL_H
+
+```
+
+
+* allocate    分配一个对象所需的内存空间 
+    - 入参1：size_type n - 要分配的对象数量（​​默认为1​​）
+    - 入参2：const_pointer hint - 内存分配提示（​​默认为0/nullptr​​）
+* deallocate   释放一个对象的内存（归还给内存池，不是给操作系统）
+    - 入参1：pointer p - 要释放的内存块的​​起始指针​​
+    - 入参2：size_type n - 要释放的对象数量（​​默认为1​​）
+* construct   在已申请的内存空间上构造对象
+    - 入参1：pointer p - 已分配但未初始化的​​内存位置指针​​
+    - 入参2：const_reference val - 用于构造的​​源对象引用​
+* destroy  析构对象
+    - 入参：pointer p - 要销毁对象的​​指针​
+* newElement  从内存池申请一个对象所需空间，并调用对象的构造函数
+    - 入参：const_reference val - 用于构造的​​源对象引用​
+* deleteElement  析构对象，将内存空间归还给内存池
+    - 入参：pointer p - 要销毁的​​对象指针​
+* allocateBlock  从操作系统申请一整块内存放入内存池
+
+### 典型应用场景
+1. 内存分配+构造
+```cpp
+pointer p = allocate(1);       // 分配内存
+construct(p, T());             // 在内存上构造对象
+```
+
+2. 完整和对象构造
+```cpp
+pointer p = newElement(T());   // 等价于 new T()
+```
+
+3. 对象销毁加内存释放
+```cpp
+destroy(p);                    // 调用析构函数
+deallocate(p, 1);             // 释放内存
+
+// 或等价操作：
+deleteElement(p);             // 一步完成
+```
+
+StackAlloc.h 自写栈容器函数
+```cpp
+
+#ifndef STACK_ALLOC_H
+#define STACK_ALLOC_H
+
+#include <memory>
+
+template <typename T>
+struct StackNode_
+{
+  T data;
+  StackNode_* prev;
+};
+
+/** T is the object to store in the stack, Alloc is the allocator to use */
+template <class T, class Alloc = std::allocator<T> >
+class StackAlloc
+{
+  public:
+    typedef StackNode_<T> Node;
+    typedef typename Alloc::template rebind<Node>::other allocator;//这里rebind重新绑定
+
+    /** Default constructor */
+    StackAlloc() {head_ = 0; }
+    /** Default destructor */
+    ~StackAlloc() { clear(); }
+
+    /** Returns true if the stack is empty */
+    bool empty() {return (head_ == 0);}
+
+    /** Deallocate all elements and empty the stack */
+    void clear() {
+      Node* curr = head_;
+      while (curr != 0)
+      {
+        Node* tmp = curr->prev;
+        allocator_.destroy(curr);
+        allocator_.deallocate(curr, 1);
+        curr = tmp;
+      }
+      head_ = 0;
+    }
+
+    /** Put an element on the top of the stack */
+    void push(T element) {
+      Node* newNode = allocator_.allocate(1);
+      allocator_.construct(newNode, Node());
+      newNode->data = element;
+      newNode->prev = head_;
+      head_ = newNode;
+    }
+
+    /** Remove and return the topmost element on the stack */
+    T pop() {
+      T result = head_->data;
+      Node* tmp = head_->prev;
+      allocator_.destroy(head_);
+      allocator_.deallocate(head_, 1);
+      head_ = tmp;
+      return result;
+    }
+
+    /** Return the topmost element */
+    T top() { return (head_->data); }
+
+  private:
+    allocator allocator_;
+    Node* head_;
+};
+
+#endif // STACK_ALLOC_H
+
+```
+
+### C++ 对象和内存联系
+RAII构造时获取资源，析构时释放资源
+new本质上也是先分配内存再进行对象的构造 
+对于智能指针的构造 使用make_unique比new优势在于其将对象内存与控制块内存绑定在一起分配，而new操作符是需要两次内存分配
+```cpp
+std::unique_ptr<Class> ptr(new Class("test"));
+std::unique_ptr<Class> ptr = std::make_unique<Class>("test");
+
 ```
