@@ -656,3 +656,133 @@ void AddTask(F&& task){ //万能引用 既可以当左值引用 又可以当右�
 - 检测 pool_ 是否指向有效对象​​
 - ​只在有效时执行资源清理​​
 - ​避免在无效或已移动对象上操作​​
+
+### threadpool-C语言版本
+
+线程池单参数处理办法
+
+```cpp
+// 定义参数结构体
+typedef struct {
+    int user_id;
+    char *username;
+    double balance;
+} AccountTaskParams;
+
+// 任务函数
+void account_task(void *arg) {
+    AccountTaskParams *params = (AccountTaskParams *)arg;
+    
+    printf("Processing account:\n");
+    printf("  ID: %d\n", params->user_id);
+    printf("  Name: %s\n", params->username);
+    printf("  Balance: %.2f\n", params->balance);
+    
+    // 清理资源
+    free(params->username);
+    free(params);
+}
+
+// 添加任务
+void add_account_task(threadpool_t *pool, int id, const char *name, double balance) {
+    // 分配并初始化参数
+    AccountTaskParams *params = malloc(sizeof(AccountTaskParams));
+    params->user_id = id;
+    
+    // 字符串需要独立分配内存
+    params->username = strdup(name);  // 复制字符串
+    params->balance = balance;
+    
+    threadpool_add(pool, account_task, params, 0);
+}
+
+// 使用示例
+add_account_task(pool, 101, "John Doe", 1234.56);
+```
+
+```cpp
+for(i = 0; i < thread_count; i++) {
+    // 创建线程
+    if(pthread_create(&(pool->threads[i]), NULL, 
+                      threadpool_thread, (void*)pool) != 0) {
+        // 创建失败时销毁线程池
+        threadpool_destroy(pool, 0);
+        return NULL;
+    }
+    // 更新线程计数
+    pool->thread_count++;
+    pool->started++;
+}
+```
+
+结构体嵌套
+```c
+
+/* 定义错误码 */
+typedef enum {
+    threadpool_invalid        = -1,
+    threadpool_lock_failure   = -2,
+    threadpool_queue_full     = -3,
+    threadpool_shutdown       = -4,
+    threadpool_thread_failure = -5
+} threadpool_error_t;
+
+typedef struct {
+    void (*function)(void *);
+    void *argument;
+} threadpool_task_t;
+
+struct threadpool_t {
+  pthread_mutex_t lock;
+  pthread_cond_t notify;
+  pthread_t *threads;
+  threadpool_task_t *queue;
+  int thread_count;
+  int queue_size;
+  int head;
+  int tail;
+  int count;
+  int shutdown;
+  int started;
+};
+```
+
+### stl迭代器
+
+- 迭代器返回的指针
+- 包括initializer_list返回的也是指针类型
+- 迭代器的黄金法则：​​begin() 指向第一个元素，end() 指向 "最后一个元素 + 1"，永远不要解引用 end()。​
+
+
+end() 是什么​​：
+- end() 返回一个特殊的位置标记（尾后迭代器）
+- 它​​不指向有效元素​​，而是表示容器的结束位置
+- 解引用 end() 会导致未定义行为（可能崩溃或输出垃圾值）
+
+```cpp
+std::vector<int> numbers = {10, 20, 30, 40, 50};
+
+auto it = numbers.begin();
+
+// 解引用访问值
+int first = *it; // 10
+
+// 算术运算
+auto third = it + 2; // 指向30
+std::cout << *(it + 2); // 30
+
+// 比较运算符
+if (it < numbers.end()) {
+    // ...
+}
+
+// 递增/递减
+it += 3; // 现在指向40
+it--;    // 现在指向30
+
+// 下标访问
+auto second = it[1]; // 相当于*(it + 1), 40
+
+// 距离计算
+auto dist = numbers.end() - numbers.begin(); // 5
+```
