@@ -786,3 +786,89 @@ auto second = it[1]; // 相当于*(it + 1), 40
 // 距离计算
 auto dist = numbers.end() - numbers.begin(); // 5
 ```
+
+### const引用
+```cpp
+    T& operator [](size_t count) { return data[count]; }
+    const T& operator [](size_t count) const { return data[count]; }
+```
+上述二者调用形式不同
+
+### traits技术
+
+```cpp
+
+#include <type_traits>
+
+template <typename T>
+struct get_type
+{
+	using type = T;
+};
+
+//如果是指针即可获得其指向的类型，相当于这里只对指针类型做处理 模板特化
+template <typename T>
+struct get_type<T*>
+{
+	using type = T;
+};
+
+template <typename T>
+MyArray<T>::MyArray(const std::initializer_list<T>& list)
+{//这里需要避免指针浅复制 ： 1.模板特化 2.traits技术
+	if(list.size())
+	{
+		unsigned count = 0;
+		data = new T[list.size()]();
+		if(std::is_pointer<T>::value)
+		{
+            for(const auto& elem : list)
+			{
+			    data[count++] = new typename get_type<T>::type(*elem);//typename表示新的类型
+			}
+
+		}
+		else
+		{
+			for(const auto& elem : list)
+			{
+				data[count++] = elem;
+			}
+		}
+	}
+	else
+	{
+		data = nullptr;
+	}
+}
+```
+
+### 模板默认参数
+
+```cpp
+namespace mystd
+{
+    using void_int_func_type = std::function<void(int&)>;
+    template<typename iter_type, typename func_type >
+    void for_each(iter_type first, iter_type last, func_type func = [](int& elem){
+        ++elem;
+    })
+    {
+        for(auto iter = first; iter != last; ++iter){
+            func(*iter);
+        }
+    }
+
+    template<typename T>
+    class MyVector
+    {
+    public:
+        template<typename T2>
+        void output(const T2& elem)
+        {
+            std::cout << elem << std::endl;
+        }
+    };
+
+} // namespace mystd
+```

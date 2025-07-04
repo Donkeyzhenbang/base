@@ -15,13 +15,14 @@ struct get_type<T*>
 	using type = T;
 };
 
+//! 注意这里只释放了指针 并没有释放指针指向的内存 会存在内存泄漏 使用vector或其他显式的内存释放策略
 template<typename T>
 class MyArray
 {
 	using iterator = T*;
 	using const_iterator = const T*;
 public:
-	MyArray(size_t count);
+	MyArray(size_t count) : m_size(count){};
 	~MyArray();
 	MyArray(const std::initializer_list<T>& list);
 	MyArray(std::initializer_list<T>&& list);
@@ -36,15 +37,27 @@ public:
 
 private:
 	T* data;
+	size_t m_size;
+	// std::vector<T> data;
 };
 
 template <typename T>
 MyArray<T>::~MyArray()
 {
-	if(data)
-	{
-		delete[] data;
-	}
+	// if(data)
+	// {
+	// 	delete[] data;
+	// }
+        if (data) {
+            if (std::is_pointer<T>::value) {
+                for (size_t i = 0; i < m_size; ++i) {
+                    if (data[i]) {
+                        delete data[i];
+                    }
+                }
+            }
+            delete[] data;
+        }
 }
 
 
@@ -63,6 +76,7 @@ typename MyArray<T>::const_iterator MyArray<T>::cbegin() const
 template <typename T>
 MyArray<T>::MyArray(const std::initializer_list<T>& list)
 {//这里需要避免指针浅复制 ： 1.模板特化 2.traits技术
+	m_size = list.size();
 	if(list.size())
 	{
 		unsigned count = 0;
