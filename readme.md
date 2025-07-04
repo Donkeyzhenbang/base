@@ -872,3 +872,50 @@ namespace mystd
 
 } // namespace mystd
 ```
+
+### 修复内存泄漏
+因为这里data是T*类型，​
+- 内存泄漏​​：在指针类型初始化时 (std::is_pointer<T>::value)，通过 new 分配了内存但析构函数只释放了 data[] 数组本身，没有释放每个元素指向的内存
+​- ​双重释放风险​​：当使用右值引用版本的构造函数时，如果 T 是指针类型，只进行了浅拷贝，可能导致多个对象管理相同内存
+
+```cpp
+template<typename T>
+class MyArray
+{
+	using iterator = T*;
+	using const_iterator = const T*;
+public:
+	MyArray(size_t count) : m_size(count){};
+	~MyArray();
+	MyArray(const std::initializer_list<T>& list);
+	MyArray(std::initializer_list<T>&& list);
+	iterator begin() const;
+	
+	const_iterator cbegin() const;
+
+	T& operator [](unsigned count) const
+	{
+		return data[count];
+	}
+
+private:
+	T* data;
+	size_t m_size;
+	// std::vector<T> data;
+};
+
+template <typename T>
+MyArray<T>::~MyArray()
+{
+    if (data) {
+        if (std::is_pointer<T>::value) {
+            for (size_t i = 0; i < m_size; ++i) {
+                if (data[i]) {
+                    delete data[i];
+                }
+            }
+        }
+        delete[] data;
+    }
+}
+```

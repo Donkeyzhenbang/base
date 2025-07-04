@@ -16,6 +16,7 @@ struct get_type<T*>
 };
 
 //! 注意这里只释放了指针 并没有释放指针指向的内存 会存在内存泄漏 使用vector或其他显式的内存释放策略
+//! 这里已经修复
 template<typename T>
 class MyArray
 {
