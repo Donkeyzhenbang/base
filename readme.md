@@ -955,61 +955,7 @@ Vector(const std::initializer_list<T>& list){
 - 解决类型不匹配问题
 - 代码清晰简洁
 
-### rebind
 
-- rebind 比如List他是三个元素 但是我们在模板类创建时使用的是std::list<int>，其内部还需要rebind把他们组合到一起进行内存分配std::list<int, std::allocator<int>> myList;
-
-```cpp
-// List节点结构（简化）
-struct ListNode {
-    ListNode* next;  // 指针域
-    ListNode* prev;  // 指针域
-    int data;         // 数据域
-};
-
-template <typename T>
-class Allocator {
-public:
-    // 关键：rebind 元编程机制
-    template <typename U>
-    struct rebind {
-        using other = Allocator<U>; // 可重绑定到其他类型
-    };
-    
-    T* allocate(size_t n);
-    void deallocate(T* p, size_t n);
-    // ...
-};
-
-template <typename T, typename Alloc = std::allocator<T>>
-class list {
-private:
-    // 定义内部节点类型
-    struct Node {
-        T value;
-        Node* next;
-        Node* prev;
-    };
-    
-    // 关键步骤：重绑定分配器
-    using NodeAlloc = typename Alloc::template rebind<Node>::other;
-    
-    NodeAlloc nodeAllocator; // 节点专用分配器
-    
-public:
-    // 添加元素实现
-    void push_back(const T& value) {
-        // 用节点分配器分配内存
-        Node* newNode = nodeAllocator.allocate(1);
-        
-        // 构造节点
-        new (&newNode->value) T(value); // 构造元素值
-        
-        // 链接节点
-        // ...
-    }
-};
-```
 
 
 ## 内存池
@@ -1204,7 +1150,6 @@ class StackAlloc
 
     /** Return the topmost element */
     T top() { return (head_->data); }
-
   private:
     allocator allocator_;
     Node* head_;
@@ -1212,6 +1157,62 @@ class StackAlloc
 
 #endif // STACK_ALLOC_H
 
+```
+
+### rebind
+- rebind是allocator内存池的核心 分配内存时不光需要知道数据类型，还需要一些元数据（指针域）
+- rebind 比如List他是三个元素 但是我们在模板类创建时使用的是std::list<int>，其内部还需要rebind把他们组合到一起进行内存分配std::list<int, std::allocator<int>> myList;
+
+```cpp
+// List节点结构（简化）
+struct ListNode {
+    ListNode* next;  // 指针域
+    ListNode* prev;  // 指针域
+    int data;         // 数据域
+};
+
+template <typename T>
+class Allocator {
+public:
+    // 关键：rebind 元编程机制
+    template <typename U>
+    struct rebind {
+        using other = Allocator<U>; // 可重绑定到其他类型
+    };
+    
+    T* allocate(size_t n);
+    void deallocate(T* p, size_t n);
+    // ...
+};
+
+template <typename T, typename Alloc = std::allocator<T>>
+class list {
+private:
+    // 定义内部节点类型
+    struct Node {
+        T value;
+        Node* next;
+        Node* prev;
+    };
+    
+    // 关键步骤：重绑定分配器
+    using NodeAlloc = typename Alloc::template rebind<Node>::other;
+    
+    NodeAlloc nodeAllocator; // 节点专用分配器
+    
+public:
+    // 添加元素实现
+    void push_back(const T& value) {
+        // 用节点分配器分配内存
+        Node* newNode = nodeAllocator.allocate(1);
+        
+        // 构造节点
+        new (&newNode->value) T(value); // 构造元素值
+        
+        // 链接节点
+        // ...
+    }
+};
 ```
 
 ### C++ 对象和内存联系
@@ -1223,3 +1224,173 @@ std::unique_ptr<Class> ptr(new Class("test"));
 std::unique_ptr<Class> ptr = std::make_unique<Class>("test");
 
 ```
+
+### placement new
+先进行内存的预先分配，在进行对象的构造，在指定内存空间进行对象的构造
+可以使用堆的空间，也可以使用栈的空间
+```cpp
+class Demo{};
+char* buf = new char[N * sizeof(Demo) + sizeof(int)];
+Demo demo = new(buf) Demo;
+demo->~Demo();
+//内存释放，如果在堆中调用delete[] buf在栈中，跳出作用域自动释放
+```
+
+
+这里多加的sizeof(int)一般用于存储元数据区 分配内存/对象额外存储的相关数量/地址信息
+```cpp
+// 在数据区构造多个对象
+for (int i = 0; i < N; i++) {
+    new (buf + sizeof(int) + i * sizeof(Demo)) Demo();
+}
+
+// 在销毁时需要知道对象数量
+int* count = reinterpret_cast<int*>(buf); // 从元数据区获取数量
+for (int i = 0; i < *count; i++) {
+    Demo* obj = reinterpret_cast<Demo*>(buf + sizeof(int) + i * sizeof(Demo));
+    obj->~Demo(); // 正确销毁对象
+}
+
+```
+
+### union
+这里就是联合体的应用之处，union同一时刻只会保存一个值，这里是空闲链表时作为Slot*使用，allocate分配时使用reinterpret_cast转成需要的数据类型返回，同时由于这里只进行内存的分配，freeSlots_里面存储内容没有改变，还是下一个freeSlots_的地址,比如下方代码中内存池应用也是先定义模板类型进行allocate
+```cpp
+
+slot_pointer_ currentBlock_;  // 内存块链表的头指针
+slot_pointer_ currentSlot_;   // 元素链表的头指针
+slot_pointer_ lastSlot_;      // 可存放元素的最后指针
+slot_pointer_ freeSlots_;     // 元素构造后释放掉的内存链表头指针
+
+union Slot_ {
+    value_type element;
+    Slot_* next;
+};
+
+typedef char* data_pointer_;  // char* 指针，主要用于指向内存首地址
+typedef Slot_ slot_type_;     // Slot_ 值类型
+typedef Slot_* slot_pointer_; // Slot_* 指针类型
+
+// 返回指向分配新元素所需内存的指针
+template <typename T, size_t BlockSize>
+inline typename MemoryPool<T, BlockSize>::pointer
+MemoryPool<T, BlockSize>::allocate(size_type, const_pointer)
+{
+  // 如果 freeSlots_ 非空，就在 freeSlots_ 中取内存
+  if (freeSlots_ != 0) {
+    pointer result = reinterpret_cast<pointer>(freeSlots_);
+    // 更新 freeSlots_
+    freeSlots_ = freeSlots_->next;
+    return result;
+  }
+  else {
+    if (currentSlot_ >= lastSlot_)
+      // 之前申请的内存用完了，分配新的 block
+      allocateBlock();
+    // 从分配的 block 中划分出去
+    return reinterpret_cast<pointer>(currentSlot_++);
+  }
+}
+
+//内存池应用于自己实现的栈数据结构
+/** Put an element on the top of the stack */
+void push(T element) {
+    Node* newNode = allocator_.allocate(1);
+    allocator_.construct(newNode, Node());
+    newNode->data = element;
+    newNode->prev = head_;
+    head_ = newNode;
+}
+```
+
+
+### 内存池链表及其源码分析
+
+#### 析构函数
+```cpp
+
+
+/* 析构函数，把内存池中所有 block delete 掉 */
+template <typename T, size_t BlockSize>
+MemoryPool<T, BlockSize>::~MemoryPool()
+throw()
+{
+  slot_pointer_ curr = currentBlock_;
+  while (curr != 0) {
+    slot_pointer_ prev = curr->next;
+    // 转化为 void 指针，是因为 void 类型不需要调用析构函数,只释放空间
+    operator delete(reinterpret_cast<void*>(curr));
+    curr = prev;
+  }
+}
+```
+
+#### 内存池工作原理
+
+内存池是一个一个的 block 以链表的形式连接起来，每一个 block 是一块大的内存，当内存池的内存不足的时候，就会向操作系统申请新的 block 加入链表。还有一个 freeSlots_ 的链表，链表里面的每一项都是对象被释放后归还给内存池的空间，内存池刚创建时 freeSlots_ 是空的，之后随着用户创建对象，再将对象释放掉，这时候要把内存归还给内存池，怎么归还呢？就是把指向这个对象的内存的指针加到 freeSlots_ 链表的前面（前插）。
+
+用户在创建对象的时候，先检查 freeSlots_ 是否为空，不为空的时候直接取出一项作为分配出的空间。否则就在当前 block 内取出一个 Slot_ 大小的内存分配出去，如果 block 里面的内存已经使用完了呢？就向操作系统申请一个新的 block。
+
+内存池工作期间的内存只会增长，不释放给操作系统。直到内存池销毁的时候，才把所有的 block delete 掉。
+
+![alt text](assets/memerypool_allocate.png)
+
+![alt text](assets/memerypool_deallocate.png)
+
+![alt text](assets/memerypool_controller.png)
+
+```mermaid
+graph LR
+    A[MemoryPool控制器] --> B[初始化]
+    A --> C[分配]
+    A --> D[释放]
+    A --> E[扩容]
+    A --> F[状态监控]
+    
+    subgraph 功能说明
+        B[初始化] -- 首次分配 --> G[基础内存块]
+        C[分配] -- 空闲链表 --> H[获取槽位]
+        D[释放] -- 回收槽位 --> I[归还空闲链表]
+        E[扩容] -- 内存不足时 --> J[分配新内存块]
+        F[状态监控] -- 统计 --> K[使用率/碎片率]
+    end
+```
+
+```mermaid
+graph LR
+    A[内存块链表] --> B[内存块1]
+    A --> C[内存块2]
+    A --> D[...]
+    A --> E[内存块N]
+    
+    B --> F[结构]
+    C --> G[结构]
+    E --> H[结构]
+    
+    subgraph 内存块结构
+        F[块头 + 槽位数组]
+        G[块头 + 槽位数组]
+        H[块头 + 槽位数组]
+        
+        F --> I[槽位1]
+        F --> J[槽位2]
+        F --> K[槽位...]
+        F --> L[槽位M]
+    end
+```
+
+```mermaid
+graph LR
+    A[空闲链表头] --> B[槽位A]
+    B --> C[槽位B]
+    C --> D[槽位C]
+    D --> E[...]
+    E --> F[槽位N]
+    
+    subgraph 槽位状态转换
+        G[未分配] --> H[已分配]
+        H --> I[释放]
+        I --> G
+    end
+```
+
