@@ -1254,7 +1254,8 @@ for (int i = 0; i < *count; i++) {
 ```
 
 ### union
-这里就是联合体的应用之处，union同一时刻只会保存一个值，这里是空闲链表时作为Slot*使用，allocate分配时使用reinterpret_cast转成需要的数据类型返回，同时由于这里只进行内存的分配，freeSlots_里面存储内容没有改变，还是下一个freeSlots_的地址,比如下方代码中内存池应用也是先定义模板类型进行allocate
+这里就是联合体的应用之处，union同一时刻只会保存一个值，这里是空闲链表时作为Slot*使用，`allocate分配时使用reinterpret_cast转成需要的数据类型返回`，同时由于这里只进行内存的分配，freeSlots_里面存储内容没有改变，还是下一个freeSlots_的地址,比如下方代码中内存池应用也是先定义模板类型进行allocate
+
 ```cpp
 
 slot_pointer_ currentBlock_;  // 内存块链表的头指针
@@ -1394,3 +1395,50 @@ graph LR
     end
 ```
 
+### gdb用法
+
+```sh
+bt 		#backtrace
+run 	#重新运行程序
+step	#单步
+next	#不进入函数内部
+break heartbeat.cpp:40 		#break 打断点在具体某个源文件行号打断点，需要编译时添加调试信息
+x 0x555555558061 #查看对应地址数值
+x/16xb 0x555555558060 #16进制显示
+p pBuffer #查看变量的值与对应地址
+p &frameData #查看地址
+p &frameData.sync #查看地址
+p frameData #查看值
+```
+
+### 三级缓存内存池
+
+
+## thrift
+
+
+## Web/HTTPServer
+
+
+### http框架
+
+
+### 缓存系统
+
+
+### 缓冲区设计
+
+
+### 异步日志库
+
+
+### 会话管理
+
+
+### 路由管理
+
+
+### 中间件
+
+
+### HTTPS
