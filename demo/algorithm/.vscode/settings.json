@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.s": "assembly",
+        "*.ld": "mapfile",
+        "iostream": "cpp"
+    }
+}

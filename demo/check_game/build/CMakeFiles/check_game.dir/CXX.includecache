@@ -1,0 +1,24 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../inc/easyx.h
+windows.h
+-
+tchar.h
+-
+
+../inc/graphics.h
+easyx.h
+-
+
+/home/jym/code/cpp/demo/check_game/src/main.cpp
+graphics.h
+-
+iostream
+-
+

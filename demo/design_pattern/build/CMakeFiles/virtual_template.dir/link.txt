@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/virtual_template.dir/src/virtual_template.cpp.o  -o bin/virtual_template 

@@ -1,0 +1,1 @@
+/usr/bin/x86_64-w64-mingw32-g++    -static-libgcc -static-libstdc++ CMakeFiles/check_game.dir/src/main.cpp.o  -o ../bin/check_game   -L/home/jym/code/cpp/demo/check_game/lib  -Wl,-rpath,/home/jym/code/cpp/demo/check_game/lib -leasyx 

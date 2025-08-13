@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jym/code/cpp/demo/dlib_demo/3d_point_cloud_ex.cpp
+dlib/gui_widgets.h
+-
+dlib/image_transforms.h
+-
+cmath
+-
+

@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=c++14 -O2 -DDLIB_JPEG_SUPPORT -Wall -Wextra  -rdynamic CMakeFiles/dlib_test.dir/3d_point_cloud_ex.cpp.o  -o dlib_test  -lSM -lICE -lX11 -lXext -Wl,-Bstatic -ldlib -Wl,-Bdynamic -lpthread -lX11 

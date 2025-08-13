@@ -1,0 +1,15 @@
+==83355== Memcheck, a memory error detector
+==83355== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==83355== Using Valgrind-3.15.0 and LibVEX; rerun with -h for copyright info
+==83355== Command: ./bin
+==83355== Parent PID: 83354
+==83355== 
+==83355== 
+==83355== HEAP SUMMARY:
+==83355==     in use at exit: 0 bytes in 0 blocks
+==83355==   total heap usage: 13 allocs, 13 frees, 74,128 bytes allocated
+==83355== 
+==83355== All heap blocks were freed -- no leaks are possible
+==83355== 
+==83355== For lists of detected and suppressed errors, rerun with: -s
+==83355== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

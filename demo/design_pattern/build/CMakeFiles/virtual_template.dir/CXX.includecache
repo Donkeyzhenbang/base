@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../inc/virtual_template.h
+iostream
+-
+
+/home/jym/code/cpp/demo/design_pattern/src/virtual_template.cpp
+memory
+-
+vector
+-
+virtual_template.h
+/home/jym/code/cpp/demo/design_pattern/src/virtual_template.h
+

@@ -1,0 +1,7 @@
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/rebuild_cache.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/edit_cache.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/virtual_test.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/factory_pattern.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/observer_pattern2.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/virtual_template.dir
+/home/jym/code/cpp/demo/design_pattern/build/CMakeFiles/observer_pattern1.dir

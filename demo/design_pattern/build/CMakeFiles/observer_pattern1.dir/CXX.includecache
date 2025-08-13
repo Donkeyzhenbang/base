@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jym/code/cpp/demo/design_pattern/src/observer_pattern1.cpp
+iostream
+-
+memory
+-
+string
+-
+list
+-
+
