@@ -118,7 +118,7 @@ public:
 template<typename T, typename... Args>
 SharedPtr<T> make_shared(Args&&... args) {
     size_t totalSize = sizeof(T) + sizeof(int);
-    void* combinedData = operator new(totalSize);  // 分配原始内存
+    void* combinedData = operator new(totalSize);  //! 分配原始内存 注意这里使用operator new分配对象+计数器内存 一并分配后续一并删除
 
     try {
         // 在原始内存上构造对象（placement new）
