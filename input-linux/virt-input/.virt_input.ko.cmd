@@ -1,0 +1,1 @@
+cmd_/home/jym/linux-kernel-dev/virt_input.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/jym/linux-kernel-dev/virt_input.ko /home/jym/linux-kernel-dev/virt_input.o /home/jym/linux-kernel-dev/virt_input.mod.o;  true

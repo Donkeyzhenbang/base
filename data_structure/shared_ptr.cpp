@@ -51,7 +51,10 @@ private:
     }
 
 public:
-    // 1. nullptr专用构造函数
+    //! 1. nullptr专用构造函数
+    //解决二义性内核 编译器无法确定应该调用：
+    //SharedPtr(T* ptr)构造函数（因为 nullptr可转换为 T*）
+    //还是拷贝构造函数（如果存在可转换的类型）
     explicit SharedPtr(std::nullptr_t) : ptr_(nullptr), pcount_(new int(0)), is_combined_(false) {
         cout << "SharedPtr(nullptr) constructed. Use count: 0" << endl;
     }
@@ -121,7 +124,7 @@ SharedPtr<T> make_shared(Args&&... args) {
     void* combinedData = operator new(totalSize);  //! 分配原始内存 注意这里使用operator new分配对象+计数器内存 一并分配后续一并删除
 
     try {
-        // 在原始内存上构造对象（placement new）
+        //! 在原始内存上构造对象（placement new）
         T* objPtr = new(combinedData) T(forward<Args>(args)...);
         
         // 初始化引用计数

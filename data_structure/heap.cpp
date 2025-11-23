@@ -11,6 +11,7 @@
  * 右子节点 2i + 2
  * vector pop_back他们出最后一个并用最后一个覆盖堆顶即相当于弹出堆顶
  * vector size元素个数
+ * !std::less<T> 的逻辑是：a < b 时返回 true（即 “b 比 a 大”）
  * 大顶堆 comp(a, b) 相当于 a < b 如果data_[selected] < data_[left] 说明左子节点更大也即优先级更高。则需要更新selected
  * left < size 确定不会越界访问
  *! explicit Heap(int initialCapacity = 10, const Compare& comp = Compare()) : comp_(comp){ 注意这里初始化方式
