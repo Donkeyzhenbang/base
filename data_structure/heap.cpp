@@ -14,7 +14,7 @@
  * !std::less<T> 的逻辑是：a < b 时返回 true（即 “b 比 a 大”）
  * 大顶堆 comp(a, b) 相当于 a < b 如果data_[selected] < data_[left] 说明左子节点更大也即优先级更高。则需要更新selected
  * left < size 确定不会越界访问
- *! explicit Heap(int initialCapacity = 10, const Compare& comp = Compare()) : comp_(comp){ 注意这里初始化方式
+ * ! explicit Heap(int initialCapacity = 10, const Compare& comp = Compare()) : comp_(comp){ 注意这里初始化方式
  */
 template<typename T, typename Compare = std::less<T>>
 class Heap{
